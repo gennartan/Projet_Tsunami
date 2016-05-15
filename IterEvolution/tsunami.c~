@@ -1,0 +1,60 @@
+#include "tsunami.h"
+
+
+double tsunamiInitialConditionOkada(double x, double y)
+{
+    double R = 6371220;
+    double x3d = 4*R*R*x / (4*R*R + x*x + y*y);
+    double y3d = 4*R*R*y / (4*R*R + x*x + y*y);
+    double z3d = R*(4*R*R - x*x - y*y) / (4*R*R + x*x + y*y);
+    double lat = asin(z3d/R)*180/M_PI;
+    double lon = atan2(y3d,x3d)*180/M_PI;
+    double lonMin = 142;
+    double lonMax = 143.75;
+    double latMin = 35.9;
+    double latMax = 39.5;
+    double olon = (lonMin+lonMax)/2;
+    double olat = (latMin+latMax)/2;
+    double angle = -12.95*M_PI/180; 
+    double lon2 = olon + (lon-olon)*cos(angle) + (lat-olat)*sin(angle);
+    double lat2 = olat - (lon-olon)*sin(angle) + (lat-olat)*cos(angle);
+    if ( lon2 <= lonMax && lon2 >= lonMin && 
+         lat2 >= latMin && lat2 <= latMax ) 
+            return 1.0;
+    else    return 0.0; 
+}
+
+void tsunamiWriteFile(const char *baseResultName, int iter, double *U, double *V, double *E, int nelem)
+{
+    int i,j;
+    const char *basename = "%s-%08d.txt";
+    char filename[256];
+    sprintf(filename,basename,baseResultName,iter);
+printf("Written on %s\n",filename);
+    FILE* file = fopen(filename,"w");
+    fprintf(file, "Number of elem %d \n", nelem);
+    for (i = 0; i < nelem; ++i) {
+    	for (j = 0; j < 3; ++j) {
+        	int index = i*3+j;
+        	fprintf(file,"%d;%d;%le;%le;%le;\n",i,j,U[index],V[index],E[index]); }}    
+    fclose(file);
+}
+
+void tsunamiReadFile(const char *baseResultName, int iter, double *U, double *V, double *E, int nelem)
+{
+    int i,j,trash,nelemFile;
+    const char *basename = "%s-%08d.txt";
+    char filename[256];
+    sprintf(filename,basename,baseResultName,iter);
+    FILE* file = fopen(filename,"r");   
+    if (!fscanf(file, "Number of elem %d \n", &nelemFile)) exit(-1);
+    if (nelem != nelemFile) {
+        printf("Error : wrong data file %d %d:-) \n",nelem,nelemFile);
+        exit(0); }
+    for (i = 0; i < nelem; ++i) {
+    	for (j = 0; j < 3; ++j) {
+        	int index = i*3+j;
+        	if (!fscanf(file,"%d;%d;%le;%le;%le;\n",&trash,&trash,&U[index],&V[index],&E[index])) exit(-1); }}    
+                     
+    fclose(file);
+}
