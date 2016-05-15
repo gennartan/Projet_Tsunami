@@ -69,9 +69,9 @@ typedef struct {
 	int size;
 	int *number; // for renumbering options...
 	int band;
-	double *E; // Eta
-	double *U; // Vitesse U
-	double *V; // Vitesse V
+	double *E;
+	double *U;
+	double *V;
 	double *FE;
 	double *FU;
 	double *FV;
@@ -326,7 +326,7 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 
 	double xEdge[2], yEdge[2], hEdge[2], phiEdge[2];
 	double xsi, weight, jac;
-	double eL, eR, uL, uR, vL, vR, unL, unR, estar, unstar;
+	double eL,eR,uL,uR,vL,vR,unL,unR,qe,qu,qv;
 	double x,y,h,sphere;
 	int i,j,k,iEdge,mapEdge[2][2];
 
@@ -340,7 +340,7 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 			yEdge[j] = myTsunami->mesh->Y[node];
 			hEdge[j] = myTsunami->mesh->Z[node];
 		}
-		int boundary = (mapEdge[1][0] == size - 1);
+		int boundary = (mapEdge[1][0] == size-1);
 
 		double dx = xEdge[1] - xEdge[0];
 		double dy = yEdge[1] - yEdge[0];
@@ -352,19 +352,14 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 			xsi = theRule->xsi[k];
 			weight = theRule->weight[k];
 			femDiscretePhi1(theSpace, xsi, phiEdge);
-			if(mapEdge[1][1]<0 || mapEdge[0][1]<0){
-				eL=0;
-				eR=0;
-				unL=0;
-				unR=0;
-		 		h=1;
-				y=0;
-				x=0;
-			}else{
+			
+			x=0.0;
+			y=0.0;
+			h=0.0;
 			for(i=0;i<2;++i){
-				x = xEdge[i]*phiEdge[i];
-				y = yEdge[i]*phiEdge[i];
-				h = hEdge[i]*phiEdge[i];
+				x += xEdge[i]*phiEdge[i];
+				y += yEdge[i]*phiEdge[i];
+				h += hEdge[i]*phiEdge[i];
 			}
 			eL = femDiscreteInterpolate(phiEdge,E,mapEdge[0],2);
 			eR = boundary ? eL : femDiscreteInterpolate(phiEdge,E,mapEdge[1],2);
@@ -374,18 +369,20 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 			vR = femDiscreteInterpolate(phiEdge, V, mapEdge[1], 2);
 			unL = uL*nx + vL*ny;
 			unR = boundary ? -unL : uR*nx + vR*ny;
-			}
-			estar = (eL+eR)/2.0+sqrt(h/g)*(unL-unR)/2.0;
-			unstar = (unL+unR)/2.0+sqrt(g/h)*(eL-eR)/2.0;
+
 			sphere = ((4*R*R+x*x+y*y)/(4*R*R));
+
+			qe = 0.5*h*   ((unL+unR) + sqrt(g/h)*(eL - eR))*sphere;
+			qu = 0.5*g*nx*((eL + eR) + sqrt(h/g)*(unL-unR))*sphere;
+			qv = 0.5*g*ny*((eL + eR) + sqrt(h/g)*(unL-unR))*sphere;
 			
 			for(i=0;i<2;++i){
-				BE[mapEdge[0][i]] -= phiEdge[i]*h*unstar*sphere   * jac*weight;
-				BU[mapEdge[0][i]] -= phiEdge[i]*nx*g*estar*sphere * jac*weight;
-				BV[mapEdge[0][i]] -= phiEdge[i]*ny*g*estar*sphere * jac*weight;
-				BE[mapEdge[1][i]] += phiEdge[i]*h*unstar*sphere   * jac*weight;
-				BU[mapEdge[1][i]] += phiEdge[i]*nx*g*estar*sphere * jac*weight;
-				BV[mapEdge[1][i]] += phiEdge[i]*ny*g*estar*sphere * jac*weight;
+				BE[mapEdge[0][i]] -= qe*phiEdge[i]*jac*weight;
+				BU[mapEdge[0][i]] -= qu*phiEdge[i]*jac*weight;
+				BV[mapEdge[0][i]] -= qv*phiEdge[i]*jac*weight;
+				BE[mapEdge[1][i]] += qe*phiEdge[i]*jac*weight;
+				BU[mapEdge[1][i]] += qu*phiEdge[i]*jac*weight;
+				BV[mapEdge[1][i]] += qv*phiEdge[i]*jac*weight;
 			}
 		}
 	}	
