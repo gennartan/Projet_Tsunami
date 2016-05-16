@@ -37,39 +37,6 @@ typedef struct {
     void (*phi1)(double xsi, double *phi);
 } femDiscrete;
 
-typedef struct {
-    int elem[2];
-    int node[2];
-} femEdge;
-
-typedef struct {
-    femMesh *mesh;
-    femEdge *edges;
-    int nEdge;
-    int nBoundary;
-} femEdges;
-
-typedef struct {
-	femMesh *mesh;
-	femEdges *edges;
-	femIntegration *rule1d;
-	femIntegration *rule2d;
-	femDiscrete *space;
-	int size;
-	double *E;
-	double *U;
-	double *V;
-	double *FE;
-	double *FU;
-	double *FV;
-	double omega;
-	double gamma;
-	double g;
-	double R;
-	double dt;
-} femTsunami;
-
-
                                 //..........
 typedef struct {                //......................................
    int elem[2];                 //........................................................
@@ -78,7 +45,7 @@ typedef struct {                //......................................
                                 //.............-/+/-`       `-/+ooooooshhhhso/-..................................
 typedef struct {                //...........:++.`      `-/ossyyhho--/++++oooos+-....................................
    femMesh *mesh;               //.........:o/`       .:+ooosyhhy:.....-+o/////+s:....................................
-   femEdge *edge;               //.......-+/`       -/+++osyhhhy-........-y//////s:.......................................
+   femEdge *edges;              //.......-+/`       -/+++osyhhhy-........-y//////s:.......................................
    int nEdge;                   //....../+.       ./++++oyhhhhh-..........-ossssss+..........................................
    int nBoundary;               //....-o:       ./++++oyhhhhhh+........-:::///++oo++//:--......................................
 } femEdges;                     //...:o.      `:+++++shhhhhhhd.....-///:..``....-/+syhhddhys+/-.................................
@@ -88,7 +55,7 @@ typedef struct {                //-o/     `:+oooosyhhhhhhhhhhh-/+.`      `-/osss
    femEdges *edges;             //  `-:.  `-/+oshhhsooshhhhhs.       .:++++oyhhhho.......`../++ooooss.................................
    femIntegration *rule1d;      // -:`  .:/+osyyyhhhyoosdhh:       `:/+++oyhhhhhy........``..-://///:.................................
    femIntegration *rule2d;      ///.  `:+++/:/ohdhhhhhhhds`      `:/++++shhhhhhh/..........`..........................................
-   femDiscrete *Space;          //` `-++:.`-+shdhhsohhhd+      `-/++++syhhhhhhhd......................................................
+   femDiscrete *space;          //` `-++:.`-+shdhhsohhhd+      `-/++++syhhhhhhhd......................................................
    int size;                    //`-/o+. -/syhdhhhhhhhh:     `-/++++syhhhhhhhhhd.`````````````````````````````````````````.:.````-.```
    double *E;                   //+oo+`./syhhhmhhhhhds.    `-/++++syhhhhhhhhhhhd-````````````````````````````````````````.//-:----+```
    double *U;                   //so--//:/shhhhdhhhh/    `-/++++syhhhhhhhhhhhhhho```````````````````````````````````````-oyyyyhhyhy-``
