@@ -116,6 +116,7 @@ void                 femTsunamiCompute(femTsunami* myTsunami);
 void                 femTsunamiAddIntegralsElement(femTsunami *myTsunami);
 void                 femTsunamiAddIntegralsEdges(femTsunami *myTsunami);
 void                 femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami);
+void 						femTest(femTsunami *myProblem);
 void                 femTsunamiFree(femTsunami *myTsunami);
 
 void                 convertTo2D(femTsunami *myTsunami);
@@ -373,66 +374,38 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 	}	
 }
 
-void femTsunamiMultiplyInverseMatrix(femTsunami *myProblem)
-{
-    double *BE = myProblem->FE;
-    double *BU = myProblem->FU;
-    double *BV = myProblem->FV;
-    femMesh *theMesh = myProblem->mesh;
-    femDiscrete *theSpace = myProblem->space;
-    femSolver *theSolver = myProblem->solver;
-    femIntegration *theRule = myProblem->rule2d;
-    
-    int n = 3;
-    double Xloc[n],Yloc[n],phi[n],dphidxsi[n],dphideta[n],Aloc[n*n],jac;
-    int iElem,iInteg,i,j,mapElem[n],mapE[n],mapU[n],mapV[n];
-    
-    
-    for (i = 0; i < n; i++)   {
-        mapE[i] = i;
-        mapU[i] = i + n;
-        mapV[i] = i + 2*n; }
-    
-    for (iElem = 0; iElem < theMesh->nElem; iElem++) {
-        femSolverInit(theSolver);
-        for (i = 0; i < n*n; i++)  Aloc[i] = 0;
-        int *mapCoord = &(myProblem->mesh->elem[iElem*n]);
-        for (j=0; j < n; ++j) {
-            mapElem[j] = iElem*n + j; 
-        	Xloc[j] = myProblem->mesh->X[mapCoord[j]];
-        	Yloc[j] = myProblem->mesh->Y[mapCoord[j]]; }
+void femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami){
+	double *BE = myTsunami->FE;
+	double *BU = myTsunami->FU;
+	double *BV = myTsunami->FV;
+	double invA[3][3] = {{18.0,-6.0,-6.0},{-6.0,18.0,-6.0},{-6.0,-6.0,18.0}};
+	double BEloc[3],BVloc[3],BUloc[3];
 
-        for (iInteg=0; iInteg < theRule->n; iInteg++) {    
-            double xsi    = theRule->xsi[iInteg];
-            double eta    = theRule->eta[iInteg];
-            double weight = theRule->weight[iInteg];  
-            femDiscretePhi2(theSpace,xsi,eta,phi);
-            femDiscreteDphi2(theSpace,xsi,eta,dphidxsi,dphideta);
-            double dxdxsi = 0;
-            double dxdeta = 0;
-            double dydxsi = 0; 
-            double dydeta = 0;
-            for (i = 0; i < n; i++) {    
-                dxdxsi += Xloc[i]*dphidxsi[i];       
-                dxdeta += Xloc[i]*dphideta[i];   
-                dydxsi += Yloc[i]*dphidxsi[i];   
-                dydeta += Yloc[i]*dphideta[i]; }
-            jac = fabs(dxdxsi * dydeta - dxdeta * dydxsi);
-            for (i = 0; i < n; i++) { 
-                for(j = 0; j < n; j++) {
-                    Aloc[i*(theSpace->n)+j] += phi[i] * phi[j] * jac * weight; }}}   
-                 
-        femSolverAssemble(theSolver,Aloc,&BE[mapElem[0]],mapE); 
-        femSolverAssemble(theSolver,Aloc,&BU[mapElem[0]],mapU); 
-        femSolverAssemble(theSolver,Aloc,&BV[mapElem[0]],mapV);     
-        double *soluce = femSolverEliminate(theSolver);
-     	for (i = 0; i < n; i++) {
-        	BE[mapElem[i]] = soluce[i];
-            BU[mapElem[i]] = soluce[i+n];
-            BV[mapElem[i]] = soluce[i+2*n]; }}
-                
+	double Xloc[3],Yloc[3],jac;
+	int i,j,iElem,mapElem[3];
+
+	for(iElem=0;iElem<myTsunami->mesh->nElem;++iElem){
+		int *mapCoord = &(myTsunami->mesh->elem[3*iElem]);
+		for(j=0;j<3;++j){
+			mapElem[j] = 3*iElem + j;
+			Xloc[j] = myTsunami->mesh->X[mapCoord[j]];
+			Yloc[j] = myTsunami->mesh->Y[mapCoord[j]];
+		}
+		jac = (Xloc[1]-Xloc[0])*(Yloc[2]-Yloc[0]) - (Yloc[1]-Yloc[0])*(Xloc[2]-Xloc[0]);
+		for(i=0;i<3;++i){
+			BEloc[i] = BE[mapElem[i]]; BE[mapElem[i]] = 0.0;
+			BUloc[i] = BU[mapElem[i]]; BU[mapElem[i]] = 0.0;
+			BVloc[i] = BV[mapElem[i]]; BV[mapElem[i]] = 0.0;
+		}
+		for(i=0;i<3;++i){
+			for(j=0;j<3;++j){
+				BE[mapElem[i]] += invA[i][j] * BEloc[j] / jac;
+				BU[mapElem[i]] += invA[i][j] * BUloc[j] / jac;
+				BV[mapElem[i]] += invA[i][j] * BVloc[j] / jac;
+			}
+		}
+	}
 }
-
 
 void convertTo2D(femTsunami *myTsunami){
 	femMesh *theMesh = myTsunami->mesh;
