@@ -16,10 +16,10 @@ DATE : 14 mai 2016
 int main(int argc, char *argv[])
 {   
 // Les seuls et uniques paramètres à modifier si on veut changer ce que le programme fait !!!!!
-   int theProgramMode = NOPLOT_MODE; 		// PLOT_MODE || NOPLOT_MODE
+   int theProgramMode = NOPLOT_MODE; 			// PLOT_MODE || NOPLOT_MODE
 	int nmax = 100;                 		// nombre d'itération maximale > nsub
 	int nsub = 25;                    		// Nombre d'itération entre chaque enregistrement de parametres
-	double dt = 1;						  			// timeStep
+	double dt = 5;						  	// timeStep
 	const char *name = "tsunamiMedium";		// Nom du fichier pour la lecture
 
 
@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     if (theProgramMode == NOPLOT_MODE) {
         printf("Computing the tsunami : be patient  :-) \n");
         tsunamiCompute(dt,nmax,nsub,meshfile,data);
-			theProgramMode = PLOT_MODE;
+		theProgramMode = PLOT_MODE;
         }
         
     if (theProgramMode == PLOT_MODE) {
@@ -69,7 +69,6 @@ int main(int argc, char *argv[])
         int width,height;
             
         double t;
-        double t0 = 0;
         double R = 6371220;
         double BathMax = 9368;
         GLfloat colors[9], coord[9];
@@ -133,7 +132,7 @@ int main(int argc, char *argv[])
                 const char *basename = "%s-%08d.txt";
                 sprintf(filename, basename, data, frame * nsub);    
           	    if (access(filename, F_OK)) {
-                    t0 = t; 
+                    // mais à quoi sert cette ligne ? 
 							}   
                 else {
                     printf("===  Reading local file %s %d %f \n",filename,frame,t);
@@ -207,7 +206,7 @@ int main(int argc, char *argv[])
                 glDisableClientState(GL_VERTEX_ARRAY); }
                 
             if (glfwGetKey(window,'V') == GLFW_PRESS)   theZoom = (theZoom + 1) % 3; 
-            if (glfwGetKey(window,'E') == GLFW_PRESS)   {thePlot = 1; t0 = t; 
+            if (glfwGetKey(window,'E') == GLFW_PRESS)   {thePlot = 1; 
 				}
             if (glfwGetKey(window,'B') == GLFW_PRESS)   thePlot = -1;
  

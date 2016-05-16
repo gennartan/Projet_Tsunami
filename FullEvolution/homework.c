@@ -57,14 +57,6 @@ typedef struct {
     int size;
 } femSolver;
 
-typedef struct 
-{
-    double *B;
-    double **A;        
-    int size;
-    int band;        
-} femBandSystem;
-
 typedef struct {
 	femMesh *mesh;
 	femEdges *edges;
