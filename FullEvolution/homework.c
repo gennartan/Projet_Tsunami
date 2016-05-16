@@ -47,22 +47,13 @@ typedef struct {
     void (*dphi2dx)(double xsi, double eta, double *dphidxsi, double *dphideta);
     void (*x1)(double *xsi);
     void (*phi1)(double xsi, double *phi);
-    void (*dphi1dx)(double xsi, double *dphidxsi);
-
 } femDiscrete;
-
-typedef struct {
-    double *B;
-    double **A;
-    int size;
-} femSolver;
 
 typedef struct {
 	femMesh *mesh;
 	femEdges *edges;
 	femIntegration *rule1d;
 	femIntegration *rule2d;
-	femSolver *solver;
 	femDiscrete *space;
 	int size;
 	double *E; // Eta
@@ -77,6 +68,7 @@ typedef struct {
 	double R;
 	double dt;
 } femTsunami;
+
 
 femMesh             *femMeshRead(const char *filename);
 void                 femMeshWrite(const femMesh* myMesh, const char *filename);
@@ -97,30 +89,20 @@ void                 femDiscretePhi2(femDiscrete* mySpace, double xsi, double et
 void                 femDiscreteDphi2(femDiscrete* mySpace, double xsi, double eta, double *dphidxsi, double *dphideta);
 void                 femDiscreteXsi1(femDiscrete* mySpace, double *xsi);
 void                 femDiscretePhi1(femDiscrete* mySpace, double xsi, double *phi);
-void                 femDiscreteDphi1(femDiscrete* mySpace, double xsi, double *dphidxsi);
 double               femDiscreteInterpolate(double *phi, double *U, int *map, int n);
-
-femSolver*           femSolverCreate(int size);
-void                 femSolverFree(femSolver* mySolver);
-void                 femSolverInit(femSolver* mySolver);
-double*              femSolverEliminate(femSolver* mySolver);
-void                 femSolverAssemble(femSolver* mySolver, double *Aloc, double *Bloc, int *map);
 
 void                 femError(char *text, int line, char *file);
 void                 femWarning(char *text, int line, char *file);
 
-// Mes fonctions
 femTsunami          *femTsunamiCreate(const char *meshFileName, double dt);
-void 				 femTsunamiInit(femTsunami *myTsunami);
+void						femTsunamiInit(femTsunami *myTsunami);
 void                 femTsunamiCompute(femTsunami* myTsunami);
 void                 femTsunamiAddIntegralsElement(femTsunami *myTsunami);
 void                 femTsunamiAddIntegralsEdges(femTsunami *myTsunami);
 void                 femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami);
-void 						femTest(femTsunami *myProblem);
 void                 femTsunamiFree(femTsunami *myTsunami);
 
 void                 convertTo2D(femTsunami *myTsunami);
-void                 convertTo3D(femTsunami *myTsunami);
 
 static const double _gaussEdge2Xsi[2]     = { 0.577350269189626,-0.577350269189626 };
 static const double _gaussEdge2Weight[2]  = { 1.000000000000000, 1.000000000000000 };
@@ -128,8 +110,6 @@ static const double _gaussEdge2Weight[2]  = { 1.000000000000000, 1.0000000000000
 static const double _gaussTri3Xsi[3]      = { 0.166666666666667, 0.666666666666667, 0.166666666666667 };
 static const double _gaussTri3Eta[3]      = { 0.166666666666667, 0.166666666666667, 0.666666666666667 };
 static const double _gaussTri3Weight[3]   = { 0.166666666666667, 0.166666666666667, 0.166666666666667 };
-
- // DEBUT DE MA PARTIE
 
 void tsunamiCompute(double dt, int nmax, int sub, const char *meshFileName, const char *baseResultName)
 {
@@ -159,7 +139,6 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 	myTsunami->edges = femEdgesCreate(myTsunami->mesh);
 	myTsunami->rule1d = femIntegrationCreate(2, FEM_EDGE);
 	myTsunami->rule2d = femIntegrationCreate(3, FEM_TRIANGLE);
-	myTsunami->solver = femSolverCreate(9);
 	myTsunami->space = femDiscreteCreate(3, FEM_TRIANGLE);
 
 	int size = myTsunami->mesh->nElem * 3 + 1;
@@ -197,7 +176,6 @@ void femTsunamiFree(femTsunami *myTsunami){
 	femEdgesFree(myTsunami->edges);
 	femIntegrationFree(myTsunami->rule1d);
 	femIntegrationFree(myTsunami->rule2d);
-	femSolverFree(myTsunami->solver);
 	femDiscreteFree(myTsunami->space);
 	free(myTsunami);
 }
@@ -425,22 +403,6 @@ void convertTo2D(femTsunami *myTsunami){
 	}
 }
 
-void convertTo3D(femTsunami *myTsunami){
-	femMesh *theMesh = myTsunami->mesh;
-	double R = myTsunami->R;
-	double *X = theMesh->X;
-	double *Y = theMesh->Y;
-	//double *Z = theMesh->Z;
-	int i;
-	for(i=0;i<theMesh->nNode;++i){
-		X[i] = 4*R*R*X[i] / (4*R*R+X[i]*X[i]+Y[i]*Y[i]);
-		Y[i] = 4*R*R*Y[i] / (4*R*R+X[i]*X[i]+Y[i]*Y[i]);
-		// Z[i] = (4*R*R-X[i]*X[i]-Y[i]*Y[i])*R / (4*R*R+X[i]*X[i]+Y[i]*Y[i]);
-		// On a de toute manière pas toucher à Z, il doit donc encore etre correct
-	}
-}
-
-
  // FIN DE MA PARTIE (le reste est du copier coller des codes écrits par Monsieur Vincent Legat)
 
 ////// FEMINTEGRATION //////
@@ -637,8 +599,7 @@ femDiscrete *femDiscreteCreate(int n, femElementType type)
         theSpace->phi2    = _p1c0_phi;
         theSpace->dphi2dx = _p1c0_dphidx;
         theSpace->x1      = _1c0_x;
-        theSpace->phi1    = _1c0_phi;
-        theSpace->dphi1dx = _1c0_dphidx; }
+        theSpace->phi1    = _1c0_phi;}
     else Error("Cannot create such a discrete space !");
     return theSpace; 
 }
@@ -673,89 +634,12 @@ void femDiscretePhi1(femDiscrete* mySpace, double xsi, double *phi)
     mySpace->phi1(xsi,phi);
 }
 
-void femDiscreteDphi1(femDiscrete* mySpace, double xsi, double *dphidxsi)
-{
-    mySpace->dphi1dx(xsi,dphidxsi);
-}
-
 double femDiscreteInterpolate(double *phi, double *U, int *map, int n)
 {
     double u = 0.0; int i;
     for (i=0; i <n; i++)
         u += phi[i]*U[map[i]];
     return u;
-}
-
-
-////// FEMSOLVER ///////
-
-femSolver *femSolverCreate(int size){
-	femSolver *mySolver = malloc(sizeof(femSolver));
-	mySolver->A = malloc(sizeof(double*)*size);
-	mySolver->B= malloc(sizeof(double)*size*(size+1));
-	mySolver->A[0] = mySolver->B + size;
-	mySolver->size = size;
-	int i;
-	for(i=1;i<size;++i){
-		mySolver->A[i] = mySolver->A[i-1] + size;
-	}
-	femSolverInit(mySolver);
-	return mySolver;
-}
-
-void femSolverFree(femSolver *mySolver){
-	free(mySolver->A);
-	free(mySolver->B);
-	free(mySolver);
-}
-
-void femSolverInit(femSolver *mySolver){
-	int i, size = mySolver->size;
-	for(i=0;i<size*(size+1);++i){
-		mySolver->B[i] = 0;
-	}
-}
-
-void femSolverAssemble(femSolver *mySolver, double *Aloc, double *Bloc, int *map){
-	int i,j;
-	for(i=0;i<3;++i){
-		for(j=0;j<3;++j){
-			mySolver->A[map[i]][map[j]] += Aloc[3*i+j];
-		}
-	mySolver->B[map[i]] += Bloc[i];
-	}
-}
-
-double *femSolverEliminate(femSolver *mySolver){
-	double  **A, *B, factor;
-    int     i, j, k, size;
-    
-    A    = mySolver->A;
-    B    = mySolver->B;
-    size = mySolver->size;
-    
-    /* Gauss elimination */
-    
-    for (k=0; k < size; k++) {
-        if ( fabs(A[k][k]) <= 1e-8 ) {
-            printf("Pivot index %d  ",k);
-            printf("Pivot value %e  ",A[k][k]);
-            Error("Cannot eliminate with such a pivot"); }
-        for (i = k+1 ; i <  size; i++) {
-            factor = A[i][k] / A[k][k];
-            for (j = k+1 ; j < size; j++) 
-                A[i][j] = A[i][j] - A[k][j] * factor;
-            B[i] = B[i] - B[k] * factor; }}
-    
-    /* Back-substitution */
-    
-    for (i = size-1; i >= 0 ; i--) {
-        factor = 0;
-        for (j = i+1 ; j < size; j++)
-            factor += A[i][j] * B[j];
-        B[i] = ( B[i] - factor)/A[i][i]; }
-    
-    return(mySolver->B);  
 }
 
 ////// ERROR //////
