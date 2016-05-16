@@ -134,7 +134,7 @@ void tsunamiCompute(double dt, int nmax, int sub, const char *meshFileName, cons
 {
 	femTsunami *myTsunami = femTsunamiCreate(meshFileName, dt);
 	int n;
-	for(n=0;n<nmax;++n){
+	for(n=0;n<=nmax;++n){
 		femTsunamiCompute(myTsunami);
 		if(n%sub == 0){
 			tsunamiWriteFile(baseResultName, n, myTsunami->U, myTsunami->V, myTsunami->E, myTsunami->mesh->nElem);
@@ -442,13 +442,13 @@ void convertTo2D(femTsunami *myTsunami){
 	double *Z = theMesh->Z;
 	int i;
 	for(i=0;i<theMesh->nNode;++i){
+		X[i] = 2*R*X[i] / (R+Z[i]);
+		Y[i] = 2*R*Y[i] / (R+Z[i]);
+	}
+	for(i=0;i<theMesh->nNode;++i){
 		if(Z[i] < 100){
 			Z[i] = 100;
 		}
-	}
-	for(i=0;i<theMesh->nNode;++i){
-		X[i] = 2*R*X[i] / (R+Z[i]);
-		Y[i] = 2*R*Y[i] / (R+Z[i]);
 	}
 }
 
