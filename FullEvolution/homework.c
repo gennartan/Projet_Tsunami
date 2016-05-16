@@ -14,18 +14,28 @@ typedef struct {
     int *elem;
     double *X;
     double *Y;
-    double *Z;
-    int nElem;
-    int nNode;
-    int nLocalNode;
-} femMesh;
-
+    double *Z;                //       _____   _____   _   _   __   _       ___       ___  ___   _   
+    int nElem;                //      |_   _| /  ___/ | | | | |  \ | |     /   |     /   |/   | | |
+    int nNode;                //        | |   | |___  | | | | |   \| |    / /| |    / /|   /| | | |
+    int nLocalNode;           //        | |   \___  \ | | | | | |\   |   / / | |   / / |__/ | | | | 
+} femMesh;                    //        | |    ___| | | |_| | | | \  |  / /  | |  / /       | | | | 
+                              //        |_|   /_____/ \_____/ |_|  \_| /_/   |_| /_/        |_| |_| 
 typedef struct {
     int n;    
     const double *xsi;
     const double *eta;
     const double *weight;
 } femIntegration;
+
+typedef struct {
+    int n;
+    int order;
+    void (*x2)(double *xsi, double *eta);
+    void (*phi2)(double xsi, double eta, double *phi);
+    void (*dphi2dx)(double xsi, double eta, double *dphidxsi, double *dphideta);
+    void (*x1)(double *xsi);
+    void (*phi1)(double xsi, double *phi);
+} femDiscrete;
 
 typedef struct {
     int elem[2];
@@ -40,25 +50,15 @@ typedef struct {
 } femEdges;
 
 typedef struct {
-    int n;
-    int order;
-    void (*x2)(double *xsi, double *eta);
-    void (*phi2)(double xsi, double eta, double *phi);
-    void (*dphi2dx)(double xsi, double eta, double *dphidxsi, double *dphideta);
-    void (*x1)(double *xsi);
-    void (*phi1)(double xsi, double *phi);
-} femDiscrete;
-
-typedef struct {
 	femMesh *mesh;
 	femEdges *edges;
 	femIntegration *rule1d;
 	femIntegration *rule2d;
 	femDiscrete *space;
 	int size;
-	double *E; // Eta
-	double *U; // Vitesse U
-	double *V; // Vitesse V
+	double *E;
+	double *U;
+	double *V;
 	double *FE;
 	double *FU;
 	double *FV;
@@ -68,6 +68,42 @@ typedef struct {
 	double R;
 	double dt;
 } femTsunami;
+
+
+                                //..........
+typedef struct {                //......................................
+   int elem[2];                 //........................................................
+   int node[2];                 //...............................................................
+}femEdge;                       //.................:///////+oosyhhysyo++/:..............................
+                                //.............-/+/-`       `-/+ooooooshhhhso/-..................................
+typedef struct {                //...........:++.`      `-/ossyyhho--/++++oooos+-....................................
+   femMesh *mesh;               //.........:o/`       .:+ooosyhhy:.....-+o/////+s:....................................
+   femEdge *edge;               //.......-+/`       -/+++osyhhhy-........-y//////s:.......................................
+   int nEdge;                   //....../+.       ./++++oyhhhhh-..........-ossssss+..........................................
+   int nBoundary;               //....-o:       ./++++oyhhhhhh+........-:::///++oo++//:--......................................
+} femEdges;                     //...:o.      `:+++++shhhhhhhd.....-///:..``....-/+syhhddhys+/-.................................
+                                //../+`     `:+++++syhhhhhhhhh..-/+:.`      `-/osyhhho++oosyysss/-...............................
+typedef struct {                //-o/     `:+oooosyhhhhhhhhhhh-/+.`      `-/osssyhhs:..-:++++++++o+.................................
+   femMesh *mesh;               //o.  `.-----/+shdddhhhhhhhhhd/.       .:+ooosyhhho.......-/o/////+s..................................
+   femEdges *edges;             //  `-:.  `-/+oshhhsooshhhhhs.       .:++++oyhhhho.......`../++ooooss.................................
+   femIntegration *rule1d;      // -:`  .:/+osyyyhhhyoosdhh:       `:/+++oyhhhhhy........``..-://///:.................................
+   femIntegration *rule2d;      ///.  `:+++/:/ohdhhhhhhhds`      `:/++++shhhhhhh/..........`..........................................
+   femDiscrete *Space;          //` `-++:.`-+shdhhsohhhd+      `-/++++syhhhhhhhd......................................................
+   int size;                    //`-/o+. -/syhdhhhhhhhh:     `-/++++syhhhhhhhhhd.`````````````````````````````````````````.:.````-.```
+   double *E;                   //+oo+`./syhhhmhhhhhds.    `-/++++syhhhhhhhhhhhd-````````````````````````````````````````.//-:----+```
+   double *U;                   //so--//:/shhhhdhhhh/    `-/++++syhhhhhhhhhhhhhho```````````````````````````````````````-oyyyyhhyhy-``
+   double *V;                   //+os+../shhhhydddo`   `-/++++syhhhhhhhhhhhhhhhhh-```````````````````````````````````.:oyyyyyyyyyyyy-`
+   double *FE;                  //hy/./syhdhhhhh+.   `-/++++oyhhhhhhhhhhhhhhhhhhhy.```````````````````````````````.-+syyyyyyyyyyyyyyy:
+   double *FU;                  //o:+syhhhhdhs/`   `:+oooosyhhhhhhhhhhhhhhhhhhhhhhy:``````````````````````````.-/+syyyyyyyyyyyyyyyyyyy
+   double *FV;                  //hhhhhhhyo:.   `-+osssyyhhhhhhhhhhhhhhhhhhhhhhhhhhh+.```````````````````..:/osyyyyyyyyyyyyyyyyyyyyyyy
+   double omega;                //oo+/:-`  `.:/osyyhhhhhhhhhhhhhhhyysyyhhhhhhhhhhhhhhy+.``````````...:/+ossyssysssoossssyyssssssssssss
+   double gamma;                //----:/oshdmdhddhhhhhhhhhhhhhhhhyssyssyhhhhhhhhhhhhhhhhs:..-::/+oosysssssssssss+ooooossssssssssssssss
+   double g;                    //hhhhhhhhhyyhhhhhhhhhhhhhhhhhhhhhsssssyhhhhhhhhhhhhhhhhhyyhhyssssssssssssssssss+ooooossssssssssssssss
+   double R;                    //hhhhhhhyyhhhhhhhhhhhhhhhhhhhhhhhhyyhhhhhhhhhhhhhhhhhhyyyhhhhhhhyysssssssssssssssssssssssssssssssssso
+   double dt;                   //hhhhhhhyhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhyhhhhhhhhhhhhhhhhhyyyysssssssssssssssssssssyyyy
+} femTsunami;                   //hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+                                //hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+                                //+osooso+++++++++++++++++++++++++++++++++++++++++++++++++++++++++oo++++++++++++++++++++++++++++++++++
 
 
 femMesh             *femMeshRead(const char *filename);
@@ -403,8 +439,6 @@ void convertTo2D(femTsunami *myTsunami){
 	}
 }
 
- // FIN DE MA PARTIE (le reste est du copier coller des codes écrits par Monsieur Vincent Legat)
-
 ////// FEMINTEGRATION //////
 femIntegration *femIntegrationCreate(int n, femElementType type)
 {
@@ -584,11 +618,6 @@ void _1c0_phi(double xsi, double *phi) {
     phi[0] = (1.0 - xsi)/2.0;
     phi[1] = (1.0 + xsi)/2.0;}
 
-void _1c0_dphidx(double xsi, double *dphidxsi){   
-    dphidxsi[0] =  -1.0/2.0;
-    dphidxsi[1] =   1.0/2.0;}
-
-
 femDiscrete *femDiscreteCreate(int n, femElementType type)
 {
     femDiscrete *theSpace = malloc(sizeof(femDiscrete)); 
@@ -657,5 +686,7 @@ void femWarning(char *text, int line, char *file)
     printf("\n  Warning in %s at line %d : \n  %s\n", file, line, text);
     printf("--------------------------------------------------------------------- Yek Yek\n");                                              
 }
+
+
 
 
