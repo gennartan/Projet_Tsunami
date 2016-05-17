@@ -36,7 +36,7 @@ typedef struct {
     int *elem;
     double *X;
     double *Y;
-    double *Z;                //       _____   _____   _   _   __   _       ___       ___  ___   _   
+    double *H;                //       _____   _____   _   _   __   _       ___       ___  ___   _   
     int nElem;                //      |_   _| /  ___/ | | | | |  \ | |     /   |     /   |/   | | |
     int nNode;                //        | |   | |___  | | | | |   \| |    / /| |    / /|   /| | | |
 } femMesh;                    //        | |   \___  \ | | | | | |\   |   / / | |   / / |__/ | | | | 
@@ -52,7 +52,7 @@ typedef struct {
 typedef struct {
     void (*x2)(double *xsi, double *eta);
     void (*phi2)(double xsi, double eta, double *phi);
-    void (*dphi2dx)(double xsi, double eta, double *dphidxsi, double *dphideta);
+    void (*dphi2dx)(double *dphidxsi, double *dphideta);
     void (*x1)(double *xsi);
     void (*phi1)(double xsi, double *phi);
 } femDiscrete;
@@ -107,7 +107,7 @@ void                 femEdgesMap(femEdges *theEdges, int index, int map[2][2]);
 femDiscrete*         femDiscreteCreate(int n, femElementType type);
 void                 femDiscreteFree(femDiscrete* mySpace);
 void                 femDiscretePhi2(femDiscrete* mySpace, double xsi, double eta, double *phi);
-void                 femDiscreteDphi2(femDiscrete* mySpace, double xsi, double eta, double *dphidxsi, double *dphideta);
+void                 femDiscreteDphi2(femDiscrete* mySpace, double *dphidxsi, double *dphideta);
 void                 femDiscretePhi1(femDiscrete* mySpace, double xsi, double *phi);
 double               femDiscreteInterpolate(double *phi, double *U, int *map, int n);
 
@@ -121,7 +121,6 @@ void                 femTsunamiAddIntegralsElement(femTsunami *myTsunami);
 void                 femTsunamiAddIntegralsEdges(femTsunami *myTsunami);
 void                 femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami);
 void                 femTsunamiFree(femTsunami *myTsunami);
-void                 femTsunamiStereographie(femTsunami *myTsunami);
 
 static const double _gaussEdge2Xsi[2]     = { 0.577350269189626,-0.577350269189626 };
 static const double _gaussEdge2Weight[2]  = { 1.000000000000000, 1.000000000000000 };
@@ -146,7 +145,7 @@ void tsunamiCompute(double dt, int nmax, int sub, const char *meshFileName, cons
 
 femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 	femTsunami *myTsunami = malloc(sizeof(femTsunami));
-
+	int i,j;
 	myTsunami->omega = 2*M_PI / 86400.0;
 	myTsunami->gamma = pow(10,-7);
 	myTsunami->g = 9.81;
@@ -154,6 +153,9 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 	myTsunami->dt = dt;
 
 	myTsunami->mesh = femMeshRead(meshFileName);
+	for(i=0;i<myTsunami->mesh->nNode;++i){
+		if(myTsunami->mesh->H[i] < 100) myTsunami->mesh->H[i] = 100;
+	}
 	myTsunami->edges = femEdgesCreate(myTsunami->mesh);
 	myTsunami->rule1d = femIntegrationCreate(2, FEM_EDGE);
 	myTsunami->rule2d = femIntegrationCreate(3, FEM_TRIANGLE);
@@ -169,7 +171,6 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 	myTsunami->FV = malloc(sizeof(double)*size);
 
 	// Initialisation des parametre de la mer (mer calme, elevation au niveau de la mer du japon)
-	int i,j;
 	for(i=0	;i<myTsunami->mesh->nElem;++i){
 		int *mapCoord = &(myTsunami->mesh->elem[3*i]);
 		for(j=0;j<3;++j){
@@ -178,8 +179,6 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 			myTsunami->V[3*i+j] = 0.0;
 		}
 	}
-	// Projection Stereographique
-	femTsunamiStereographie(myTsunami);
 	
 	return myTsunami;
 }
@@ -234,7 +233,7 @@ void femTsunamiAddIntegralsElement(femTsunami *myTsunami){
 	double *V = myTsunami->V;
 	double *Y = myTsunami->mesh->Y;
 	double *X = myTsunami->mesh->X;
-	double *Z = myTsunami->mesh->Z;
+	double *Z = myTsunami->mesh->H;
 
 	femIntegration *theRule = myTsunami->rule2d;
 	femDiscrete *theSpace = myTsunami->space;
@@ -260,7 +259,7 @@ void femTsunamiAddIntegralsElement(femTsunami *myTsunami){
 			eta = theRule->eta[k];
 			weight = theRule->weight[k];
 			femDiscretePhi2(theSpace,xsi,eta, phi);
-			femDiscreteDphi2(theSpace, xsi, eta, dphidxsi, dphideta);
+			femDiscreteDphi2(theSpace,dphidxsi, dphideta);
 			double dxdxsi = 0.0;
 			double dxdeta = 0.0;
 			double dydxsi = 0.0;
@@ -324,7 +323,7 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 			int node = myTsunami->edges->edges[iEdge].node[j];
 			xEdge[j] = myTsunami->mesh->X[node];
 			yEdge[j] = myTsunami->mesh->Y[node];
-			hEdge[j] = myTsunami->mesh->Z[node];
+			hEdge[j] = myTsunami->mesh->H[node];
 		}
 		int boundary = (mapEdge[1][0] == size-1);
 
@@ -411,24 +410,6 @@ void femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami){
 	}
 }
 
-void femTsunamiStereographie(femTsunami *myTsunami){
-	femMesh *theMesh = myTsunami->mesh;
-	double R = myTsunami->R;
-	double *X = theMesh->X;
-	double *Y = theMesh->Y;
-	double *Z = theMesh->Z;
-	int i;
-	for(i=0;i<theMesh->nNode;++i){
-		X[i] = 2*R*X[i] / (R+Z[i]);
-		Y[i] = 2*R*Y[i] / (R+Z[i]);
-	}
-	for(i=0;i<theMesh->nNode;++i){
-		if(Z[i] < 100){
-			Z[i] = 100;
-		}
-	}
-}
-
 ////// FEMINTEGRATION //////
 
 femIntegration *femIntegrationCreate(int n, femElementType type)
@@ -467,9 +448,9 @@ femMesh *femMeshRead(const char *filename)
     if(!fscanf(file, "Number of nodes %d \n", &theMesh->nNode)) exit(-1);
     theMesh->X = malloc(sizeof(double)*theMesh->nNode);
     theMesh->Y = malloc(sizeof(double)*theMesh->nNode);
-    theMesh->Z = malloc(sizeof(double)*theMesh->nNode);
+    theMesh->H = malloc(sizeof(double)*theMesh->nNode);
     for (i = 0; i < theMesh->nNode; ++i) {
-        if(!fscanf(file,"%d : %le %le %le \n",&trash,&theMesh->X[i],&theMesh->Y[i],&theMesh->Z[i])) exit(-1);
+        if(!fscanf(file,"%d : %le %le %le \n",&trash,&theMesh->X[i],&theMesh->Y[i],&theMesh->H[i])) exit(-1);
 	 }
     
     char str[256]; 
@@ -488,7 +469,7 @@ void femMeshFree(femMesh *theMesh)
 {
     free(theMesh->X);
     free(theMesh->Y);
-    free(theMesh->Z);
+    free(theMesh->H);
     free(theMesh->elem);
     free(theMesh);
 }
@@ -581,7 +562,7 @@ void _p1c0_phi(double xsi, double eta, double *phi){
     phi[1] = xsi;
     phi[2] = eta;}
 
-void _p1c0_dphidx(double xsi, double eta, double *dphidxsi, double *dphideta){
+void _p1c0_dphidx(double *dphidxsi, double *dphideta){
     dphidxsi[0] = -1.0;  
     dphidxsi[1] =  1.0;
     dphidxsi[2] =  0.0;
@@ -622,9 +603,9 @@ void femDiscretePhi2(femDiscrete* mySpace, double xsi, double eta, double *phi)
     mySpace->phi2(xsi,eta,phi);
 }
 
-void femDiscreteDphi2(femDiscrete* mySpace, double xsi, double eta, double *dphidxsi, double *dphideta)
+void femDiscreteDphi2(femDiscrete* mySpace, double *dphidxsi, double *dphideta)
 {
-    mySpace->dphi2dx(xsi,eta,dphidxsi,dphideta);
+    mySpace->dphi2dx(dphidxsi,dphideta);
 }
 
 void femDiscretePhi1(femDiscrete* mySpace, double xsi, double *phi)
