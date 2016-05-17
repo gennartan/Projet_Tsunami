@@ -3,7 +3,8 @@ Author : Antoine Gennart
 Date   : mai 2016
 NOMA   : 4140 1400
 
-Fortement inspire des solutions des devoirs de M. Vincent Legat disponibles sur le site du cours.
+Fortement inspire de l'excellent cours ainsi que des solutions des devoirs de M. Vincent Legat, professeur 
+a l'universite catholique de Louvain, disponibles sur le site du cours.
 
 Description generale de l'algorithme :
 - Creation et initialisation du probleme en lisant les donnees stockees dans le meshfile.
@@ -15,7 +16,9 @@ Description generale de l'algorithme :
 - Ecriture dans un fichier (baseResultName) des donnees du tsunami pour les temps demandes
 - Liberation de toutes les variables du problemes
 
-Plus de details sont donnes directement dans les fonctions si necessaire.
+Plus de details sont donnes directement dans les fonctions si necessaire (mais c'est rarement necessaire
+etant donne que les codes sont clairs, et, comme mentionne precedement, ils sont inspires des devoirs de 
+M. Vincent Legat.
 **/
 
 #include"tsunami.h"
@@ -53,7 +56,6 @@ typedef struct {
     void (*x1)(double *xsi);
     void (*phi1)(double xsi, double *phi);
 } femDiscrete;
-
                                 //..........
 typedef struct {                //......................................
    int elem[2];                 //............................................
@@ -119,8 +121,7 @@ void                 femTsunamiAddIntegralsElement(femTsunami *myTsunami);
 void                 femTsunamiAddIntegralsEdges(femTsunami *myTsunami);
 void                 femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami);
 void                 femTsunamiFree(femTsunami *myTsunami);
-
-void                 convertTo2D(femTsunami *myTsunami);
+void                 femTsunamiStereographie(femTsunami *myTsunami);
 
 static const double _gaussEdge2Xsi[2]     = { 0.577350269189626,-0.577350269189626 };
 static const double _gaussEdge2Weight[2]  = { 1.000000000000000, 1.000000000000000 };
@@ -167,7 +168,7 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 	myTsunami->FU = malloc(sizeof(double)*size);
 	myTsunami->FV = malloc(sizeof(double)*size);
 
-
+	// Initialisation des parametre de la mer (mer calme, elevation au niveau de la mer du japon)
 	int i,j;
 	for(i=0	;i<myTsunami->mesh->nElem;++i){
 		int *mapCoord = &(myTsunami->mesh->elem[3*i]);
@@ -177,7 +178,8 @@ femTsunami *femTsunamiCreate(const char *meshFileName, double dt){
 			myTsunami->V[3*i+j] = 0.0;
 		}
 	}
-	convertTo2D(myTsunami);
+	// Projection Stereographique
+	femTsunamiStereographie(myTsunami);
 	
 	return myTsunami;
 }
@@ -211,9 +213,11 @@ void femTsunamiCompute(femTsunami* myTsunami){
 		FU[i] = 0.0;
 		FV[i] = 0.0;
 	}
+	// Calcul des FE, FU et FV (qui sont les derivees
 	femTsunamiAddIntegralsElement(myTsunami);
 	femTsunamiAddIntegralsEdges(myTsunami);
 	femTsunamiMultiplyInverseMatrix(myTsunami);
+	// Euler Explicite ...
 	for(i=0;i<size;++i){
 		E[i] += dt * FE[i];
 		U[i] += dt * FU[i];
@@ -243,7 +247,7 @@ void femTsunamiAddIntegralsElement(femTsunami *myTsunami){
 	double  gamma = myTsunami->gamma;
 	double  R = myTsunami->R;
 	double  omega = myTsunami->omega;
-
+	
 	for(iElem=0;iElem<myTsunami->mesh->nElem;++iElem){
 		int *mapCoord = &(myTsunami->mesh->elem[3*iElem]);
 		for(j=0;j<3;++j){
@@ -280,10 +284,11 @@ void femTsunamiAddIntegralsElement(femTsunami *myTsunami){
 			u = femDiscreteInterpolate(phi,U,mapElem,3);
 			v = femDiscreteInterpolate(phi,V,mapElem,3);
 			
-			double lat = h/R;//((4*R*R-x*x-y*y))/(4*R*R+x*x+y*y); == sin(theta)
+			double lat = ((4*R*R-x*x-y*y))/(4*R*R+x*x+y*y);    // sin(theta) = z3d / R
 			const double coriolis = 2*omega*lat;
 			const double sphere = ((4*R*R+x*x+y*y)/(4*R*R));
 
+			// Calcul de l'integrale pour l'element iElem (Eq. dans l'enonce du projet)
 			for(i=0;i<3;++i){
 				BE[mapElem[i]] += ((dphidx[i]*h*u+dphidy[i]*h*v)*sphere + (phi[i]*(h*(x*u+y*v)/(R*R))))            * jac*weight;
 				BU[mapElem[i]] += ((phi[i]*(coriolis*v-gamma*u)+dphidx[i]*g*e*sphere) + (phi[i]*g*x*e/(2*R*R)))    * jac*weight;
@@ -357,6 +362,7 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 			qu = 0.5*g*nx*((eL + eR) + sqrt(h/g)*(unL-unR))*sphere;
 			qv = 0.5*g*ny*((eL + eR) + sqrt(h/g)*(unL-unR))*sphere;
 			
+			// Calcul de l'integrale pour l'element iElem (Eq. dans l'enonce du projet)
 			for(i=0;i<2;++i){
 				BE[mapEdge[0][i]] -= qe*phiEdge[i]*jac*weight;
 				BU[mapEdge[0][i]] -= qu*phiEdge[i]*jac*weight;
@@ -369,11 +375,14 @@ void femTsunamiAddIntegralsEdges(femTsunami *myTsunami){
 	}	
 }
 
+// Travaillant sur des elements lineaires triangulaires, la matrice A est constante a un facteur pres : 
+// le jacobien (et il en va de meme pour son inverse). On peut donc multipliser par l'inverse de la matrice
+// de la maniere suivante :
 void femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami){
 	double *BE = myTsunami->FE;
 	double *BU = myTsunami->FU;
 	double *BV = myTsunami->FV;
-	double invA[3][3] = {{18.0,-6.0,-6.0},{-6.0,18.0,-6.0},{-6.0,-6.0,18.0}};
+	double invA[3][3] = {{18.0,-6.0,-6.0},{-6.0,18.0,-6.0},{-6.0,-6.0,18.0}}; 
 	double BEloc[3],BVloc[3],BUloc[3];
 
 	double Xloc[3],Yloc[3],jac;
@@ -402,7 +411,7 @@ void femTsunamiMultiplyInverseMatrix(femTsunami *myTsunami){
 	}
 }
 
-void convertTo2D(femTsunami *myTsunami){
+void femTsunamiStereographie(femTsunami *myTsunami){
 	femMesh *theMesh = myTsunami->mesh;
 	double R = myTsunami->R;
 	double *X = theMesh->X;
@@ -421,6 +430,7 @@ void convertTo2D(femTsunami *myTsunami){
 }
 
 ////// FEMINTEGRATION //////
+
 femIntegration *femIntegrationCreate(int n, femElementType type)
 {
     femIntegration *theRule = malloc(sizeof(femIntegration));
@@ -646,6 +656,31 @@ void femWarning(char *text, int line, char *file)
     printf("--------------------------------------------------------------------- Yek Yek\n");                                              
 }
 
-
-
-
+// BONNE LECTURE !
+//                          oooo$$$$$$$$$$$$oooo
+//                      oo$$$$$$$$$$$$$$$$$$$$$$$$o
+//                   oo$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$o         o$   $$ o$
+//   o $ oo        o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$o       $$ $$ $$o$
+//oo $ $ "$      o$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$o       $$$o$$o$
+//"$$$$$$o$     o$$$$$$$$$      $$$$$$$$$$$      $$$$$$$$$$o    $$$$$$$$
+//  $$$$$$$    $$$$$$$$$$$      $$$$$$$$$$$      $$$$$$$$$$$$$$$$$$$$$$$
+//  $$$$$$$$$$$$$$$$$$$$$$$    $$$$$$$$$$$$$    $$$$$$$$$$$$$$  """$$$
+//   "$$$""""$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$
+//    $$$   o$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     "$$$o
+//   o$$"   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$       $$$o
+//   $$$    $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$" "$$$$$$ooooo$$$$o
+//  o$$$oooo$$$$$  $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$   o$$$$$$$$$$$$$$$$$
+//  $$$$$$$$"$$$$   $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     $$$$""""""""
+// """"       $$$$    "$$$$$$$$$$$$$$$$$$$$$$$$$$$$"      o$$$
+//            "$$$o     """$$$$$$$$$$$$$$$$$$"$$"         $$$
+//              $$$o          "$$""$$$$$$""""           o$$$
+//               $$$$o                                o$$$"
+//                "$$$$o      o$$$$$$o"$$$$o        o$$$$
+//                  "$$$$$oo     ""$$$$o$$$$$o   o$$$$""
+//                     ""$$$$$oooo  "$$$o$$$$$$$$$"""
+//                        ""$$$$$$$oo $$$$$$$$$$
+//                                """"$$$$$$$$$$$
+//                                    $$$$$$$$$$$$
+//                                     $$$$$$$$$$"
+//           
+// source de ce dessin : https://fr.wikipedia.org/wiki/Art_ASCII
